@@ -57,11 +57,11 @@ const Footer = () => {
           <div>
             <h3 className="text-lg font-semibold mb-4">Contact</h3>
             <div className="space-y-2">
-              <div className="flex items-center space-x-2 text-gray-300">
+              <div className="flex items-center space-x-2 text-gray-200">
                 <Mail className="h-4 w-4" />
                 <span className="text-sm">hello@swiftly.app</span>
               </div>
-              <div className="flex items-center space-x-2 text-gray-300">
+              <div className="flex items-center space-x-2 text-gray-200">
                 <Phone className="h-4 w-4" />
                 <span className="text-sm">+91 98765 43210</span>
               </div>
@@ -69,7 +69,7 @@ const Footer = () => {
           </div>
         </div>
 
-        <div className="border-t border-gray-800 mt-8 pt-8 text-center">
+        <div className="border-t border-gray-700 mt-8 pt-8 text-center">
           <p className="text-gray-400 text-sm">
             © 2024 Swiftly. All rights reserved. Making city commuting smarter and more efficient.
           </p>

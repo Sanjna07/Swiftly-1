@@ -52,7 +52,7 @@ const AboutPage = () => {
               </div>
               <h3 className="text-xl font-semibold text-slate-900 mb-4">Our Vision</h3>
               <p className="text-slate-600">
-                A world where urban mobility is seamless, sustainable, and stress-free for everyone.
+                A world where urban mobility is seamless, sustainable, and stress-free for everyone — where people can move through cities effortlessly without wasting time in traffic, searching endlessly for parking, or contributing to unnecessary congestion. In this world, smart technology, efficient infrastructure, and sustainable solutions work together to create a smoother urban experience. Transportation becomes reliable, accessible, and environmentally responsible, allowing individuals to focus on what truly matters in their day while cities become cleaner, more organized, and more livable for future generations.
               </p>
             </div>
 
