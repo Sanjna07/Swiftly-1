@@ -128,34 +128,7 @@ const AboutPage = () => {
           </div>
         </div>
       </section>
-
-      {/* Team Section */}
-      <section className="py-16 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12 animate-fade-in">
-            <h2 className="text-3xl font-bold text-slate-900 mb-4">Meet Our Team</h2>
-            <p className="text-xl text-slate-600">Passionate innovators building the future of urban mobility</p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 max-w-4xl mx-auto">
-            {team.map((member, index) => (
-              <div key={index} className="text-center animate-slide-up hover-lift bg-gray-50 p-8 rounded-xl shadow-sm" style={{ animationDelay: `${index * 0.2}s` }}>
-                <div className="relative mb-6">
-                  <img
-                    src={member.image}
-                    alt={member.name}
-                    className="w-40 h-40 rounded-full mx-auto object-cover hover-glow"
-                  />
-                </div>
-                <h3 className="text-2xl font-semibold text-slate-900 mb-2">{member.name}</h3>
-                <p className="text-blue-600 font-medium mb-4 text-lg">{member.role}</p>
-                <p className="text-slate-600 max-w-md mx-auto">{member.bio}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
+      
       {/* CTA Section */}
       <section className="py-16 bg-gradient-to-r from-blue-600 to-blue-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">

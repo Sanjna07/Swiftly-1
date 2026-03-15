@@ -26,11 +26,11 @@ const LoginPage = () => {
     <div className="min-h-screen bg-white flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center animate-fade-in">
-          <h2 className="text-3xl font-bold text-slate-900 mb-2">Welcome back</h2>
+          <h2 className="text-3xl font-bold text-slate-700 mb-2">Welcome back</h2>
           <p className="text-slate-600">Sign in to your Swiftly account</p>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-xl shadow-lg p-8 animate-slide-up">
+        <div className="bg-white border border-gray-100 rounded-xl shadow-lg p-8 animate-slide-up">
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-2">
