@@ -1300,6 +1300,10 @@ const PublicTransportSuggestions = () => {
       async (pos) => {
         const coords: LatLng = [pos.coords.latitude, pos.coords.longitude];
         setCurrentLocation(coords);
+        
+        // Save to localStorage for ParkingSwap and SmartParkingFinder interoperability
+        localStorage.setItem('userCoords', JSON.stringify({ lat: coords[0], lng: coords[1] }));
+        
         try {
           const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${coords[0]}&lon=${coords[1]}`);
           const data = await res.json();

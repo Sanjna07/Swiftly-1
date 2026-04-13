@@ -1,5 +1,18 @@
-import { useState, useEffect } from 'react';
-import { Users, MapPin, Clock, Zap, Bell, CheckCircle, AlertCircle } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Users, MapPin, Clock, Zap, Bell, CheckCircle, AlertCircle, X, Navigation } from 'lucide-react';
+import { io } from 'socket.io-client';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
+import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
+import markerIcon from 'leaflet/dist/images/marker-icon.png';
+import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+
+// @ts-ignore
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({ iconUrl: markerIcon, iconRetinaUrl: markerIcon2x, shadowUrl: markerShadow });
+
+const socket = io('http://localhost:5000');
 
 interface SwapRequest {
   id: string;
@@ -10,6 +23,8 @@ interface SwapRequest {
   spotType: string;
   price: string;
   status: 'available' | 'reserved' | 'completed';
+  lat?: number;
+  lng?: number;
 }
 
 interface UserSwapStatus {
@@ -20,6 +35,121 @@ interface UserSwapStatus {
     price: string;
   };
 }
+
+interface MapModalProps {
+  swap: SwapRequest;
+  userCoords: { lat: number; lng: number } | null;
+  onClose: () => void;
+}
+
+const MapModal = ({ swap, userCoords, onClose }: MapModalProps) => {
+  const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstance = useRef<L.Map | null>(null);
+  const [routeInfo, setRouteInfo] = useState<{dist: string, time: string} | null>(null);
+
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const timer = setTimeout(() => {
+      if (mapInstance.current) return;
+      const targetLat = swap.lat || 28.6139 + Math.random() * 0.05;
+      const targetLng = swap.lng || 77.2090 + Math.random() * 0.05;
+
+      const map = L.map(mapRef.current!).setView([targetLat, targetLng], 14);
+      mapInstance.current = map;
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors',
+      }).addTo(map);
+
+      const parkingIcon = L.divIcon({
+        html: `<div style="background:#2563eb;color:#fff;border-radius:50%;width:34px;height:34px;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;box-shadow:0 2px 10px rgba(37,99,235,0.45);border:2px solid #fff;">P</div>`,
+        className: '',
+        iconSize: [34, 34],
+        iconAnchor: [17, 17],
+      });
+      L.marker([targetLat, targetLng], { icon: parkingIcon })
+        .addTo(map)
+        .bindPopup(`<b>${swap.location}</b><br>${swap.price}`)
+        .openPopup();
+
+      if (userCoords) {
+        const userIcon = L.divIcon({
+          html: `<div style="background:#16a34a;border-radius:50%;width:14px;height:14px;border:3px solid #fff;box-shadow:0 0 0 3px rgba(22,163,74,0.35);"></div>`,
+          className: '',
+          iconSize: [14, 14],
+          iconAnchor: [7, 7],
+        });
+        L.marker([userCoords.lat, userCoords.lng], { icon: userIcon }).addTo(map).bindPopup('Your location');
+
+        fetch(`https://router.project-osrm.org/route/v1/driving/${userCoords.lng},${userCoords.lat};${targetLng},${targetLat}?overview=full&geometries=geojson`)
+          .then(r => r.json())
+          .then(data => {
+            if (data.routes?.length) {
+              const route = data.routes[0];
+              L.geoJSON(route.geometry, { style: { color: '#2563eb', weight: 4, opacity: 0.85 } }).addTo(map);
+              map.fitBounds(L.geoJSON(route.geometry).getBounds(), { padding: [50, 50] });
+              
+              const distKm = (route.distance / 1000).toFixed(1);
+              const timeMin = Math.round(route.duration / 60);
+              setRouteInfo({ dist: `${distKm} km`, time: `${timeMin} min` });
+            } else {
+              L.polyline([[userCoords.lat, userCoords.lng], [targetLat, targetLng]], { color: '#2563eb', weight: 2, dashArray: '6 6', opacity: 0.65 }).addTo(map);
+              map.fitBounds([[userCoords.lat, userCoords.lng], [targetLat, targetLng]], { padding: [50, 50] });
+            }
+          })
+          .catch(() => {
+            L.polyline([[userCoords.lat, userCoords.lng], [targetLat, targetLng]], { color: '#2563eb', weight: 2, dashArray: '6 6', opacity: 0.65 }).addTo(map);
+            map.fitBounds([[userCoords.lat, userCoords.lng], [targetLat, targetLng]], { padding: [50, 50] });
+          });
+      }
+    }, 120);
+
+    return () => {
+      clearTimeout(timer);
+      mapInstance.current?.remove();
+      mapInstance.current = null;
+    };
+  }, []);
+
+  return (
+    <div
+      style={{ position: 'fixed', inset: 0, zIndex: 50, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="bg-white rounded-2xl overflow-hidden shadow-2xl w-full max-w-2xl flex flex-col" style={{ maxHeight: '90vh' }}>
+        <div className="flex items-start justify-between p-4 border-b border-gray-100">
+          <div>
+            <h2 className="text-base font-semibold text-gray-900">{swap.location}</h2>
+            <p className="text-sm text-gray-400 mt-0.5">
+              {swap.spotType} spot
+            </p>
+          </div>
+          <button onClick={onClose} className="text-gray-300 hover:text-gray-600 ml-4 flex-shrink-0 transition-colors">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div ref={mapRef} style={{ height: '380px', width: '100%', flexShrink: 0 }} />
+
+        <div className="p-4 flex items-center justify-between border-t border-gray-100 bg-slate-50">
+          <div className="flex gap-4 text-sm text-gray-500">
+            <span className="flex items-center gap-1 font-medium text-gray-900">
+              {swap.price}
+            </span>
+          </div>
+          {routeInfo ? (
+            <div className="flex items-center gap-1.5 text-sm text-blue-600 font-medium">
+              <Navigation className="h-4 w-4" /> 
+              {routeInfo.dist} · {routeInfo.time} drive
+            </div>
+          ) : userCoords ? (
+            <span className="text-sm text-gray-400">Locating route...</span>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const ParkingSwap = () => {
   const [activeSwaps, setActiveSwaps] = useState<SwapRequest[]>([
@@ -60,23 +190,49 @@ const ParkingSwap = () => {
   });
 
   const [notifications, setNotifications] = useState<string[]>([]);
+  const [mapSpot, setMapSpot] = useState<SwapRequest | null>(null);
+  const [userCoords, setUserCoords] = useState<{lat: number, lng: number} | null>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('userCoords') || 'null');
+      return saved || { lat: 28.6139, lng: 77.2090 };
+    } catch {
+      return { lat: 28.6139, lng: 77.2090 };
+    }
+  });
 
-  // Simulate real-time updates
+  // Handle real-time updates and logic
   useEffect(() => {
+    socket.on('new_spot_available', (newSwap) => {
+      setActiveSwaps(prev => [newSwap, ...prev]);
+      setNotifications(prev => [...prev, `New spot available at ${newSwap.location}!`]);
+    });
+
+    socket.on('spot_reserved', (reservedSwapId) => {
+      setActiveSwaps(prev => prev.map(swap => 
+        swap.id === reservedSwapId ? { ...swap, status: 'reserved' } : swap
+      ));
+    });
+
     const interval = setInterval(() => {
       setActiveSwaps(prev => prev.map(swap => {
         const currentMinutes = parseInt(swap.leavingIn);
-        if (currentMinutes > 1) {
+        if (currentMinutes > 1 && swap.leavingIn.includes('min')) {
           return { ...swap, leavingIn: `${currentMinutes - 1} min` };
         }
         return swap;
       }));
     }, 60000); // Update every minute
 
-    return () => clearInterval(interval);
+    return () => {
+      socket.off('new_spot_available');
+      socket.off('spot_reserved');
+      clearInterval(interval);
+    };
   }, []);
 
   const handleReserveSpot = (swapId: string) => {
+    socket.emit('reserve_spot', swapId);
+    
     setActiveSwaps(prev => prev.map(swap => 
       swap.id === swapId ? { ...swap, status: 'reserved' } : swap
     ));
@@ -88,13 +244,29 @@ const ParkingSwap = () => {
   };
 
   const handleMarkLeavingSoon = () => {
+    const spotDetails = {
+      location: 'Central Mall - Level 3',
+      type: 'Covered',
+      price: '₹30/hr'
+    };
+
+    const savedUser = JSON.parse(localStorage.getItem('user') || '{}');
+    const newSwap = {
+      id: Math.random().toString(36).substr(2, 9),
+      userName: savedUser.name || 'Current User', 
+      location: spotDetails.location,
+      distance: '0.1 km',
+      leavingIn: '5 min',
+      spotType: spotDetails.type,
+      price: spotDetails.price,
+      status: 'available'
+    };
+
+    socket.emit('mark_leaving_soon', newSwap);
+
     setUserSwapStatus({
       isLeavingSoon: true,
-      spotDetails: {
-        location: 'Central Mall - Level 3',
-        type: 'Covered',
-        price: '₹30/hr'
-      }
+      spotDetails
     });
     setNotifications(prev => [...prev, 'Your parking spot is now marked as "Leaving Soon" - nearby users will be notified!']);
   };
@@ -115,6 +287,7 @@ const ParkingSwap = () => {
 
   return (
     <section className="py-8 bg-white">
+      {mapSpot && <MapModal swap={mapSpot} userCoords={userCoords} onClose={() => setMapSpot(null)} />}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -255,27 +428,31 @@ const ParkingSwap = () => {
                     </div>
                   </div>
 
-                  <div className="flex space-x-3">
+                  <div className="flex justify-start space-x-3 mt-4">
                     {swap.status === 'available' ? (
                       <>
                         <button
                           onClick={() => handleReserveSpot(swap.id)}
-                          className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 flex items-center justify-center space-x-2"
+                          className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 flex items-center space-x-2 shadow-sm font-medium"
                         >
                           <Zap className="h-4 w-4" />
                           <span>Reserve Spot</span>
                         </button>
-                        <button className="px-4 py-2 border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors duration-200">
-                          <MapPin className="h-4 w-4" />
+                        <button
+                          onClick={() => setMapSpot(swap)}
+                          className="px-4 py-2 border border-blue-200 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors duration-200 flex items-center shadow-sm"
+                          title="View on Map"
+                        >
+                          <MapPin className="h-5 w-5" />
                         </button>
                       </>
                     ) : swap.status === 'reserved' ? (
-                      <div className="flex-1 px-4 py-2 bg-yellow-100 text-yellow-700 rounded-lg flex items-center justify-center space-x-2">
+                      <div className="px-5 py-2 bg-yellow-100 text-yellow-700 rounded-lg flex items-center space-x-2">
                         <AlertCircle className="h-4 w-4" />
                         <span>Reserved by someone else</span>
                       </div>
                     ) : (
-                      <div className="flex-1 px-4 py-2 bg-gray-100 text-gray-600 rounded-lg flex items-center justify-center space-x-2">
+                      <div className="px-5 py-2 bg-gray-100 text-gray-600 rounded-lg flex items-center space-x-2">
                         <CheckCircle className="h-4 w-4" />
                         <span>Completed</span>
                       </div>

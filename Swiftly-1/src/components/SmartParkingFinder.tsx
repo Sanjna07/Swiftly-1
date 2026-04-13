@@ -662,6 +662,7 @@ interface MapModalProps {
 const MapModal = ({ spot, userCoords, onClose }: MapModalProps) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<L.Map | null>(null);
+  const [routeInfo, setRouteInfo] = useState<{dist: string, time: string} | null>(null);
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -700,13 +701,26 @@ const MapModal = ({ spot, userCoords, onClose }: MapModalProps) => {
           .addTo(map)
           .bindPopup('Your location');
 
-        // Dashed line between user and parking
-        L.polyline(
-          [[userCoords.lat, userCoords.lng], [spot.lat, spot.lng]],
-          { color: '#2563eb', weight: 2, dashArray: '6 6', opacity: 0.65 }
-        ).addTo(map);
-
-        map.fitBounds([[userCoords.lat, userCoords.lng], [spot.lat, spot.lng]], { padding: [50, 50] });
+        fetch(`https://router.project-osrm.org/route/v1/driving/${userCoords.lng},${userCoords.lat};${spot.lng},${spot.lat}?overview=full&geometries=geojson`)
+          .then(r => r.json())
+          .then(data => {
+            if (data.routes?.length) {
+              const route = data.routes[0];
+              L.geoJSON(route.geometry, { style: { color: '#2563eb', weight: 4, opacity: 0.85 } }).addTo(map);
+              map.fitBounds(L.geoJSON(route.geometry).getBounds(), { padding: [50, 50] });
+              
+              const distKm = (route.distance / 1000).toFixed(1);
+              const timeMin = Math.round(route.duration / 60);
+              setRouteInfo({ dist: `${distKm} km`, time: `${timeMin} min` });
+            } else {
+              L.polyline([[userCoords.lat, userCoords.lng], [spot.lat, spot.lng]], { color: '#2563eb', weight: 2, dashArray: '6 6', opacity: 0.65 }).addTo(map);
+              map.fitBounds([[userCoords.lat, userCoords.lng], [spot.lat, spot.lng]], { padding: [50, 50] });
+            }
+          })
+          .catch(() => {
+            L.polyline([[userCoords.lat, userCoords.lng], [spot.lat, spot.lng]], { color: '#2563eb', weight: 2, dashArray: '6 6', opacity: 0.65 }).addTo(map);
+            map.fitBounds([[userCoords.lat, userCoords.lng], [spot.lat, spot.lng]], { padding: [50, 50] });
+          });
       }
     }, 120);
 
@@ -755,15 +769,14 @@ const MapModal = ({ spot, userCoords, onClose }: MapModalProps) => {
               {spot.avail} spots left
             </span>
           </div>
-          {/* OSM directions link — opens in OSM, not Google */}
-          <a
-            href={`https://www.openstreetmap.org/directions?from=${userCoords?.lat ?? ''},${userCoords?.lng ?? ''}&to=${spot.lat},${spot.lng}&engine=graphhopper_car`}
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors"
-          >
-            <Navigation className="h-4 w-4" /> Get directions
-          </a>
+          {routeInfo ? (
+            <div className="flex items-center gap-1.5 text-sm text-blue-600 font-medium">
+              <Navigation className="h-4 w-4" /> 
+              {routeInfo.dist} · {routeInfo.time} drive
+            </div>
+          ) : userCoords ? (
+            <span className="text-sm text-gray-400">Locating route...</span>
+          ) : null}
         </div>
       </div>
     </div>
@@ -896,7 +909,9 @@ const SmartParkingFinder = () => {
   const [mapSpot, setMapSpot] = useState<ParkingSpot | null>(null);
 
   const [locationMode, setLocationMode] = useState<'detect' | 'manual'>('detect');
-  const [detectedCoords, setDetectedCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [detectedCoords, setDetectedCoords] = useState<{ lat: number; lng: number } | null>(() => {
+    try { return JSON.parse(localStorage.getItem('userCoords') || 'null'); } catch { return null; }
+  });
   const [detectStatus, setDetectStatus] = useState('Not set');
   const [detectLoading, setDetectLoading] = useState(false);
   const [manualQuery, setManualQuery] = useState('');
@@ -939,7 +954,9 @@ const SmartParkingFinder = () => {
     setDetectStatus('Detecting...');
     navigator.geolocation.getCurrentPosition(
       pos => {
-        setDetectedCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setDetectedCoords(coords);
+        localStorage.setItem('userCoords', JSON.stringify(coords));
         setDetectStatus('Location detected ✓');
         setDetectLoading(false);
       },

@@ -3,11 +3,14 @@ import { User, Mail, Phone, MapPin, Car, Clock, Bell, Shield, CreditCard } from 
 
 const SettingsPage = () => {
   const [activeTab, setActiveTab] = useState('profile');
-  const [profileData, setProfileData] = useState({
-    name: 'John Doe',
-    email: 'john.doe@example.com',
-    phone: '+91 98765 43210',
-    address: 'Sector 18, Gurugram, Haryana'
+  const [profileData, setProfileData] = useState(() => {
+    const savedUser = JSON.parse(localStorage.getItem('user') || '{}');
+    return {
+      name: savedUser.name || '',
+      email: savedUser.email || '',
+      phone: savedUser.phone || '',
+      address: 'Sector 18, Gurugram, Haryana'
+    };
   });
 
   const [vehicleData, setVehicleData] = useState({

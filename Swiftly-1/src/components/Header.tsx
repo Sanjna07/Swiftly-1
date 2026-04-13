@@ -1,5 +1,5 @@
 import { MapPin, Menu, X, ChevronDown, User } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
 const Header = () => {
@@ -8,9 +8,21 @@ const Header = () => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const location = useLocation();
   
-  // Mock user state - in real app this would come from context/state management
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('token'));
+  const [user, setUser] = useState<{name: string, email: string} | null>(JSON.parse(localStorage.getItem('user') || 'null'));
 
+  useEffect(() => {
+    const checkAuth = () => {
+      setIsLoggedIn(!!localStorage.getItem('token'));
+      setUser(JSON.parse(localStorage.getItem('user') || 'null'));
+    };
+    window.addEventListener('storage', checkAuth);
+    window.addEventListener('auth_change', checkAuth);
+    return () => {
+      window.removeEventListener('storage', checkAuth);
+      window.removeEventListener('auth_change', checkAuth);
+    };
+  }, []);
   const isActive = (path: string) => location.pathname === path;
   const isServicesActive = () => ['/parking', '/transport', '/swap'].includes(location.pathname);
 
@@ -120,14 +132,18 @@ const Header = () => {
                   onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
                   className="flex items-center space-x-2 p-2 rounded-lg hover:bg-blue-50 transition-colors duration-200"
                 >
-                  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                    <User className="h-5 w-5 text-blue-600" />
+                  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold uppercase">
+                    {user?.name ? user.name.charAt(0) : <User className="h-5 w-5" />}
                   </div>
                   <ChevronDown className={`h-4 w-4 text-slate-600 transition-transform duration-200 ${isUserMenuOpen ? 'rotate-180' : ''}`} />
                 </button>
                 
                 {isUserMenuOpen && (
                   <div className="absolute top-full right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-blue-100 animate-slide-down">
+                    <div className="px-4 py-3 border-b border-gray-100">
+                      <p className="text-sm font-medium text-gray-900 truncate">{user?.name || 'User'}</p>
+                      <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                    </div>
                     <Link
                       to="/settings"
                       className="block px-4 py-3 hover:bg-blue-50 transition-colors duration-200 rounded-t-xl"
@@ -137,6 +153,9 @@ const Header = () => {
                     </Link>
                     <button
                       onClick={() => {
+                        localStorage.removeItem('token');
+                        localStorage.removeItem('user');
+                        window.dispatchEvent(new Event('auth_change'));
                         setIsLoggedIn(false);
                         setIsUserMenuOpen(false);
                       }}
@@ -234,6 +253,9 @@ const Header = () => {
                   </Link>
                   <button
                     onClick={() => {
+                      localStorage.removeItem('token');
+                      localStorage.removeItem('user');
+                      window.dispatchEvent(new Event('auth_change'));
                       setIsLoggedIn(false);
                       setIsMenuOpen(false);
                     }}
